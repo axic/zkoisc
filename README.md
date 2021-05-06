@@ -68,6 +68,24 @@ It compiles to the following (24 cells, the remaining 40 are padding zeroes):
 
 It will print the "Hello zkOISC!" message.
 
+### oisc.zok
+
+The [ZoKrates](https://github.com/Zokrates/ZoKrates) implementation has limitations:
+- It only supports the stop and put syscalls, and not the get syscall.
+- The put syscall has an output buffer size limit of 16 characters.
+- The memory is limited to 64 cells in total (that is 64 x 32-bit).
+- The circuit size increases mostly linearly with the number of steps.
+  Each step takes around 16k constraints, and the current step limit of 64
+  results in a circuit of 1050k constraints.
+
+The input to the program is the complete memory, each 64 cell. The output witness
+has the `memory`, `pc`, `is_running`, `output`, and `output_len` fields.
+
+It should be possible to tweak these limits, i.e. more memory and less steps,
+or less memory and more steps, depending on the requirements.
+
+**NOTE:** Need to use [this patched branch](https://github.com/leonardoalt/ZoKrates/tree/zkevm_patch) of ZoKrates for the moment.
+
 ### Build
 
 ```sh

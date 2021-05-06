@@ -1,4 +1,5 @@
-// TODO: make this using fields instead of u32
+import "utils/casts/field_to_u32" as field_to_u32
+import "utils/casts/u32_to_field" as u32_to_field
 
 const u32 MEMORY_SIZE = 64
 const u32 OUTPUT_SIZE = 16
@@ -6,7 +7,7 @@ const u32 OUTPUT_SIZE = 16
 const u32 STEP_LIMIT = 64
 
 struct Memory {
-	u32[MEMORY_SIZE] values
+	field[MEMORY_SIZE] values
 }
 
 struct State {
@@ -21,7 +22,7 @@ struct State {
 // out-of-bounds checks. Perhaps we could rewrite the code to avoid the need for them.
 
 def readmem(State s, u32 pos) -> u32:
-	return if (pos > MEMORY_SIZE) then 0 else s.memory.values[pos] fi
+	return if (pos > MEMORY_SIZE) then 0 else field_to_u32(s.memory.values[pos]) fi
 
 // If strict is false, this will silently allow OOB writes.
 // i.e. strict is false within a syscall
@@ -31,7 +32,7 @@ def writemem(State s, bool strict, u32 pos, u32 val) -> State:
 	bool would_fail = pos > MEMORY_SIZE
 	bool avoid_fail = !strict && would_fail
 	pos = if avoid_fail then 0 else pos fi
-	s.memory.values[pos] = if avoid_fail then s.memory.values[pos] else val fi
+	s.memory.values[pos] = if avoid_fail then s.memory.values[pos] else u32_to_field(val) fi
 	return s
 
 def main(Memory init) -> State:

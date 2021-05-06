@@ -16,7 +16,24 @@ struct State {
 const u32 MEMORY_SIZE = 64
 const u32 OUTPUT_SIZE = 16
 // The hardcoded execution step limit
-const u32 STEP_LIMIT = 2
+const u32 STEP_LIMIT = 64
+
+// The readmem/writemem helpers are needed partially because zokrates has 
+// out-of-bounds checks. Perhaps we could rewrite the code to avoid the need for them.
+
+def readmem(State s, u32 pos) -> u32:
+	return if (pos > MEMORY_SIZE) then 0 else s.memory.values[pos] fi
+
+// If strict is false, this will silently allow OOB writes.
+// i.e. strict is false within a syscall
+//
+// TODO: Is there a nicer way to implement this?
+def writemem(State s, bool strict, u32 pos, u32 val) -> State:
+	bool would_fail = pos > MEMORY_SIZE
+	bool avoid_fail = !strict && would_fail
+	pos = if avoid_fail then 0 else pos fi
+	s.memory.values[pos] = if avoid_fail then s.memory.values[pos] else val fi
+	return s
 
 def main(Memory init) -> State:
 	State s = State {
@@ -26,29 +43,35 @@ def main(Memory init) -> State:
 		output: [0; OUTPUT_SIZE],
 		output_len: 0,
 	}
+
+	// TODO: rewrite into functions to avoid all the duplicate `if s.runnning` checks
 	for u32 step in 0..STEP_LIMIT do
 		// Note, due to checking s.running in every state modifying part,
 		// the below code will keep "applying" the same last step from
-		// the point it has been srtopped, until STEP_LIMIT.
+		// the point it has been stopped, until STEP_LIMIT.
 
-		u32 a = s.memory.values[s.pc]
-		u32 b = s.memory.values[s.pc + 1]
-		u32 c = s.memory.values[s.pc + 2]
+		u32 a = readmem(s, s.pc)
+		u32 b = readmem(s, s.pc + 1)
+		u32 c = readmem(s, s.pc + 2)
 
 		// This is the special case
 		bool syscall = (a == 4294967295)
 		// stop() syscall
-		s.running = !(syscall && c == 0)
+		bool is_stop = syscall && c == 0
+		s.running = !is_stop
 		// put() syscall
-		s.output[s.output_len] = s.memory.values[b]
-		s.output_len = if (s.running && syscall && c == 1) then (s.output_len + 1) else s.output_len fi
+		bool is_put = syscall && c == 1
+		s.output[s.output_len] = readmem(s, b)
+		s.output_len = if (s.running && is_put) then (s.output_len + 1) else s.output_len fi
 
 		// This is the regular codepath
-		u32 a_prime = s.memory.values[a] - s.memory.values[b]
-		bool cond = s.memory.values[a] <= s.memory.values[b]
+		bool is_jump = !syscall && (readmem(s, a) <= readmem(s, b))
+		bool is_move = !syscall
+		u32 a_prime = if (s.running && is_move) then (readmem(s, a) - readmem(s, b)) else readmem(s, a) fi
+		s = writemem(s, !syscall, a, a_prime)
 
-		s.pc = if (s.running && (syscall || !cond)) then c else (s.pc + 3) fi
-		s.memory.values[a] = if (s.running && !syscall) then a_prime else s.memory.values[a] fi
+		u32 new_pc = if is_jump then c else (s.pc + 3) fi
+		s.pc = if s.running then new_pc else s.pc fi
 	endfor
 
 	return s

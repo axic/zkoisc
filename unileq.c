@@ -1,5 +1,5 @@
 /*
-unileq.c - v1.25
+unileq.c - v1.24
 
 Copyright (C) 2020 by Alec Dee - alecdee.github.io - akdee144@gmail.com
 
@@ -23,21 +23,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --------------------------------------------------------------------------------
 The Unileq Architecture
 
-Unileq is an architecture that shows how minimal a computer can be and still
-work. Whereas most computer architectures have hundreds or thousands of
-different instructions that can be used to build a program, unileq has only one.
-Its one instruction is simple: it performs a subtraction and then jumps. Despite
-its simplicity, we can use this instruction to create any program we want.
-Unileq follows in the footsteps of the subleq architecture.
+Unileq is an architecture that is meant to show how minimal a computer can be
+and still work. Whereas most computer architectures have hundreds or thousands
+of different instructions that can be used to build a program, unileq has only
+one. Its one instruction is simple: it performs a subtraction and then jumps.
+Despite its simplicity, we can use this instruction to create any program we
+want. Unileq is based off of the subleq architecture.
 
 To execute a unileq instruction, we first load 3 operands: A, B, and C. We then
 subtract the value at address B from the value at address A. If the value at A
 was less than or equal to the value at B, then we jump to C. Otherwise, we jump
-by 3. We then load the 3 operands at our new address in memory and begin again.
+by 3.
 
-We keep track of the operands we're loading with the instruction pointer, IP,
-which is set to 0 at the start of the program. The pseudocode below shows the
-main unileq loop:
+We keep track of the instruction operands we're loading with the instruction
+pointer, IP, which is set to 0 at the start of the program. The pseudocode below
+shows the main unileq loop:
 
 	while true
           A=mem[IP+0]
@@ -251,7 +251,7 @@ unllabel* unllabeladd(unlhashmap* map,unllabel* lbl) {
 #define UNL_MAX_PARSE    (1<<30)
 
 typedef struct unlstate {
-	u64 *mem,alloc,ip;
+	u64 *mem,alloc,ip,max_set,max_get;
 	u32 state;
 	char statestr[256];
 } unlstate;
@@ -273,6 +273,25 @@ void unlfree(unlstate* st) {
 	if (st) {
 		unlclear(st);
 		free(st);
+	}
+}
+
+char* statusstr(unlstate *st) {
+	static char* msg[] = {
+		"running", "complete", "parser_error", "memory_error",
+	};
+	if (st->state <= sizeof(msg))
+		return msg[st->state];
+	return "unknown";
+}
+
+void dumpmem(unlstate* st) {
+	printf("state=%s ip=%llu max_set=%llu max_get=%llu alloc=%llu\n", statusstr(st), st->ip, st->max_set, st->max_get, st->alloc);
+	for (u64 pos = 0; pos < st->alloc; pos++) {
+//		printf("0x%08llx, ", st->mem[pos]);
+		printf("\"%llu\", ", st->mem[pos]);
+		if ((pos % 8) == 0)
+			printf("\n");
 	}
 }
 
@@ -408,6 +427,7 @@ void unlparsestr(unlstate* st,const char* str) {
 		snprintf(st->statestr,sizeof(st->statestr),fmt,err,line,window,under);
 	}
 	unlhashfree(map);
+	dumpmem(st);
 }
 
 void unlparsefile(unlstate* st,const char* path) {
@@ -463,6 +483,8 @@ void unlsetip(unlstate* st,u64 ip) {
 }
 
 u64 unlgetmem(unlstate* st,u64 addr) {
+	if (addr > st->max_get)
+		st->max_get = addr;
 	//Return the memory value at addr.
 	return addr<st->alloc?st->mem[addr]:0;
 }
@@ -495,18 +517,23 @@ void unlsetmem(unlstate* st,u64 addr,u64 val) {
 			return;
 		}
 	}
+	if (addr > st->max_set)
+		st->max_set = addr;
 	st->mem[addr]=val;
 }
+
 
 void unlrun(unlstate* st,u32 iters) {
 	//Run unileq for a given number of iterations. If iters=-1, run forever.
 	u32 dec=iters!=(u32)-1;
 	u64 a,b,c,ma,mb,ip=st->ip;
+	dumpmem(st);
 	for (;iters && st->state==UNL_RUNNING;iters-=dec) {
 		//Load a, b, and c.
 		a=unlgetmem(st,ip++);
 		b=unlgetmem(st,ip++);
 		c=unlgetmem(st,ip++);
+		printf("a=%llx b=%llx c=%llx mem[a]=%llx mem[b]=%llx\n", a, b, c, unlgetmem(st, a), unlgetmem(st, b));
 		//Execute a normal unileq instruction.
 		mb=unlgetmem(st,b);
 		if (a!=(u64)-1) {
@@ -541,8 +568,9 @@ int main(int argc,char** argv) {
 			"loop: len ?+4  neg  #if [len]=0, exit\n"
 			"      0-1 data 1    #print a letter\n"
 			"      ?-2 neg  loop #increment pointer and loop\n"
-			"data: 85 115 97 103 101 58 32 117 110 105 108 101"
-			"      113 32 102 105 108 101 46 117 110 108 10\n"
+//			"data: 85 115 97 103 101 58 32 117 110 105 108 101"
+//			"      113 32 102 105 108 101 46 117 110 108 10\n"
+			"data: 72 101 108 108 111 32 122 107 79 73 83 67 33\n"
 			"neg:  0-1\n"
 			"len:  len-data"
 		);
@@ -552,6 +580,7 @@ int main(int argc,char** argv) {
 	}
 	//Main loop.
 	unlrun(unl,(u32)-1);
+	dumpmem(unl);
 	//Exit and print status if there was an error.
 	u32 ret=unl->state;
 	if (ret!=UNL_COMPLETE) {unlprintstate(unl);}

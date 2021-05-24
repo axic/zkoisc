@@ -1,22 +1,21 @@
 // TODO: make this using fields instead of u32
 
+const u32 MEMORY_SIZE = 64
+const u32 OUTPUT_SIZE = 16
+// The hardcoded execution step limit
+const u32 STEP_LIMIT = 64
+
 struct Memory {
-	u32[64] values
+	u32[MEMORY_SIZE] values
 }
 
 struct State {
 	Memory memory
 	u32 pc
 	bool running
-	u32[16] output
+	u32[OUTPUT_SIZE] output
 	u32 output_len
 }
-
-// NOTE: ensure it matches the above struct
-const u32 MEMORY_SIZE = 64
-const u32 OUTPUT_SIZE = 16
-// The hardcoded execution step limit
-const u32 STEP_LIMIT = 64
 
 // The readmem/writemem helpers are needed partially because zokrates has 
 // out-of-bounds checks. Perhaps we could rewrite the code to avoid the need for them.

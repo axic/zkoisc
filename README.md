@@ -75,8 +75,8 @@ The [ZoKrates](https://github.com/Zokrates/ZoKrates) implementation has limitati
 - The put syscall has an output buffer size limit of 16 characters.
 - The memory is limited to 64 cells in total (that is 64 x 32-bit).
 - The circuit size increases mostly linearly with the number of steps.
-  Each step takes around 16k constraints, and the current step limit of 64
-  results in a circuit of 1050k constraints.
+  Each step takes around 44k constraints, and the current step limit of 64
+  results in a circuit of 2860k constraints.
 
 The input to the program is the complete memory, each 64 cell. The output witness
 has the `memory`, `pc`, `is_running`, `output`, and `output_len` fields.
@@ -84,16 +84,16 @@ has the `memory`, `pc`, `is_running`, `output`, and `output_len` fields.
 It should be possible to tweak these limits, i.e. more memory and less steps,
 or less memory and more steps, depending on the requirements.
 
-**NOTE:** Need to use [this patched branch](https://github.com/leonardoalt/ZoKrates/tree/zkevm_patch) of ZoKrates for the moment.
+**NOTE:** Need to use ZoKrates 0.7.6 or later.
 
 ### Build
 
 ```sh
-zokrates compile -i oisc.zok
+zokrates compile --isolate-branches -i oisc.zok
 ```
 
 ### Run
 
 ```sh
-cat helloworld.input | ./zokrates compute-witness --stdin --abi
+cat helloworld.input | zokrates compute-witness --stdin --abi
 ```
